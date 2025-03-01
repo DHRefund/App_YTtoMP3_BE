@@ -3,15 +3,16 @@ const cors = require("cors");
 const youtubedl = require("youtube-dl-exec");
 const path = require("path");
 const fs = require("fs");
+const os = require("os");
 const app = express();
 
 app.use(
   cors({
-    origin: ["https://app-y-tto-mp-3-fe.vercel.app", "http://localhost:3000"],
+    origin: "*",
     methods: ["GET", "POST"],
     allowedHeaders: ["Content-Type", "Authorization"],
     exposedHeaders: ["Content-Disposition", "Content-Type", "Content-Length"],
-    credentials: true,
+    credentials: false,
     optionsSuccessStatus: 200,
   })
 );
@@ -25,14 +26,17 @@ function encodeRFC5987ValueChars(str) {
     .replace(/%(?:7C|60|5E)/g, unescape);
 }
 
-// Tạo thư mục tạm để lưu file
-const tempDir = path.join(__dirname, "temp");
+// Sử dụng thư mục temp của hệ thống
+const tempDir = path.join(os.tmpdir(), "youtube-dl-temp");
 if (!fs.existsSync(tempDir)) {
   fs.mkdirSync(tempDir, { recursive: true });
 }
 
+app.get("/", (req, res) => {
+  res.json({ status: "Server is running" });
+});
+
 app.post("/download", async (req, res) => {
-  res.send(`đây là backend`);
   let outputPath = null;
 
   try {
@@ -58,8 +62,8 @@ app.post("/download", async (req, res) => {
 
     outputPath = path.join(tempDir, `${safeTitle}.webm`);
     console.log("Output path:", outputPath);
-    // Download và convert sang MP3
 
+    // Download và convert sang MP3
     await youtubedl(url, {
       extractAudio: true,
       audioFormat: "mp3",
@@ -68,24 +72,24 @@ app.post("/download", async (req, res) => {
       noCheckCertificates: true,
       noWarnings: true,
       preferFreeFormats: true,
-    })
-      .then((output) => console.log("output download>>>", output))
-      .catch((error) => console.error("Error in youtube-dl-exec:", error));
+      addHeader: [
+        "referer:youtube.com",
+        "user-agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+      ],
+    });
 
-    // console.log(outputPath);
-    // console.log(fs.existsSync(outputPath));
     // Kiểm tra file có tồn tại không
     if (!fs.existsSync(outputPath)) {
       throw new Error("File không được tạo thành công");
     }
-    console.log("<<<<<<<<<<>>>>>>>>>>");
+
     const stat = fs.statSync(outputPath);
 
     // Set headers
     res.setHeader("Content-Length", stat.size);
     res.setHeader("Content-Type", "video/webm");
     res.setHeader("Content-Disposition", `attachment; filename="${safeTitle}.webm"`);
-    console.log("<<<<<<<<<<>>>>>>>>>>");
+
     // Stream file to response
     const stream = fs.createReadStream(outputPath);
 
@@ -95,30 +99,33 @@ app.post("/download", async (req, res) => {
       if (!res.headersSent) {
         res.status(500).json({ error: "Lỗi khi đọc file" });
       }
-      // Cleanup file nếu có lỗi
-      if (outputPath && fs.existsSync(outputPath)) {
-        fs.unlinkSync(outputPath);
-      }
+      cleanup(outputPath);
     });
-    console.log("check>>>>>>>", res.headersSent);
+
     stream.on("end", () => {
-      // Cleanup file sau khi stream hoàn tất
-      if (outputPath && fs.existsSync(outputPath)) {
-        fs.unlinkSync(outputPath);
-      }
+      cleanup(outputPath);
     });
 
     // Pipe stream to response
     stream.pipe(res);
   } catch (error) {
-    console.error("Error:");
-    // Cleanup file nếu có lỗi
-    if (outputPath && fs.existsSync(outputPath)) {
-      fs.unlinkSync(outputPath);
-    }
-    res.status(500).json({ error: "Có lỗi xảy ra khi tải file: " + error });
+    console.error("Error:", error);
+    cleanup(outputPath);
+    res.status(500).json({ error: "Có lỗi xảy ra khi tải file: " + error.message });
   }
 });
+
+// Hàm cleanup
+function cleanup(filePath) {
+  if (filePath && fs.existsSync(filePath)) {
+    try {
+      fs.unlinkSync(filePath);
+      console.log("Cleaned up file:", filePath);
+    } catch (err) {
+      console.error("Error cleaning up file:", err);
+    }
+  }
+}
 
 // Cleanup temp directory on startup
 fs.readdir(tempDir, (err, files) => {
