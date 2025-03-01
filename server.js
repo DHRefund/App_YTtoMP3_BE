@@ -23,6 +23,7 @@ if (!fs.existsSync(tempDir)) {
 }
 
 app.post("/download", async (req, res) => {
+  res.send(`đây là backend`);
   let outputPath = null;
 
   try {
