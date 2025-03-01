@@ -5,7 +5,16 @@ const path = require("path");
 const fs = require("fs");
 const app = express();
 
-app.use(cors({ exposedHeaders: ["Content-Disposition", "Content-Type", "Content-Length"] }));
+app.use(
+  cors({
+    origin: ["https://app-y-tto-mp-3-fe.vercel.app", "http://localhost:3000"],
+    methods: ["GET", "POST"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    exposedHeaders: ["Content-Disposition", "Content-Type", "Content-Length"],
+    credentials: true,
+    optionsSuccessStatus: 200,
+  })
+);
 app.use(express.json());
 
 // Hàm mã hóa tên file
