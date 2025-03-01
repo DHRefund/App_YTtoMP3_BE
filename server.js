@@ -2,7 +2,6 @@ const express = require("express");
 const cors = require("cors");
 const youtubedl = require("youtube-dl-exec");
 const path = require("path");
-const fs = require("fs");
 const os = require("os");
 const app = express();
 
@@ -28,8 +27,8 @@ function encodeRFC5987ValueChars(str) {
 
 // Sử dụng thư mục temp của hệ thống
 const tempDir = path.join(os.tmpdir(), "youtube-dl-temp");
-if (!fs.existsSync(tempDir)) {
-  fs.mkdirSync(tempDir, { recursive: true });
+if (!os.existsSync(tempDir)) {
+  os.mkdirSync(tempDir, { recursive: true });
 }
 
 app.get("/", (req, res) => {
@@ -79,11 +78,11 @@ app.post("/download", async (req, res) => {
     });
 
     // Kiểm tra file có tồn tại không
-    if (!fs.existsSync(outputPath)) {
+    if (!os.existsSync(outputPath)) {
       throw new Error("File không được tạo thành công");
     }
 
-    const stat = fs.statSync(outputPath);
+    const stat = os.statSync(outputPath);
 
     // Set headers
     res.setHeader("Content-Length", stat.size);
@@ -91,7 +90,7 @@ app.post("/download", async (req, res) => {
     res.setHeader("Content-Disposition", `attachment; filename="${safeTitle}.webm"`);
 
     // Stream file to response
-    const stream = fs.createReadStream(outputPath);
+    const stream = os.createReadStream(outputPath);
 
     // Xử lý các sự kiện của stream
     stream.on("error", (error) => {
@@ -117,9 +116,9 @@ app.post("/download", async (req, res) => {
 
 // Hàm cleanup
 function cleanup(filePath) {
-  if (filePath && fs.existsSync(filePath)) {
+  if (filePath && os.existsSync(filePath)) {
     try {
-      fs.unlinkSync(filePath);
+      os.unlinkSync(filePath);
       console.log("Cleaned up file:", filePath);
     } catch (err) {
       console.error("Error cleaning up file:", err);
@@ -128,11 +127,11 @@ function cleanup(filePath) {
 }
 
 // Cleanup temp directory on startup
-fs.readdir(tempDir, (err, files) => {
+os.readdir(tempDir, (err, files) => {
   if (err) console.error("Error reading temp dir:", err);
   else {
     files.forEach((file) => {
-      fs.unlink(path.join(tempDir, file), (err) => {
+      os.unlink(path.join(tempDir, file), (err) => {
         if (err) console.error("Error deleting temp file:", err);
       });
     });
